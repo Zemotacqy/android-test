@@ -37,6 +37,7 @@ import java.io.PrintStream;
 public class OrchestrationResultPrinter extends OrchestrationRunListener {
 
   private static final String LOG_TAG = "OdoInstrResultPrinter";
+  private static final String DTAG = "OrchestrationResultPrinter";
 
   /**
    * This value, if stored with key {@link android.app.Instrumentation#REPORT_KEY_IDENTIFIER},
@@ -113,6 +114,7 @@ public class OrchestrationResultPrinter extends OrchestrationRunListener {
   /** send a status for the start of a each test, so long tests can be seen as "running" */
   @Override
   public void testStarted(ParcelableDescription description) {
+    Log.i(DTAG, "testStarted: " + description.getDisplayName());
     this.description = description; // cache ParcelableDescription in case of a crash
     String testClass = description.getClassName();
     String testName = description.getMethodName();
@@ -135,6 +137,7 @@ public class OrchestrationResultPrinter extends OrchestrationRunListener {
 
   @Override
   public void testFinished(ParcelableDescription description) {
+    Log.i(DTAG, "testFinished: " + description.getDisplayName());
     if (testResultCode == REPORT_VALUE_RESULT_OK) {
       testResult.putString(Instrumentation.REPORT_KEY_STREAMRESULT, ".");
     }
@@ -143,17 +146,20 @@ public class OrchestrationResultPrinter extends OrchestrationRunListener {
 
   @Override
   public void testFailure(ParcelableFailure failure) {
+    Log.i(DTAG, "testFailure: " + failure.getDescription().getDisplayName());
     testResultCode = REPORT_VALUE_RESULT_FAILURE;
     reportFailure(failure);
   }
 
   @Override
   public void testAssumptionFailure(ParcelableFailure failure) {
+    Log.i(DTAG, "testAssumptionFailure: " + failure.getDescription().getDisplayName());
     testResultCode = REPORT_VALUE_RESULT_ASSUMPTION_FAILURE;
     testResult.putString(REPORT_KEY_STACK, failure.getTrace());
   }
 
   private void reportFailure(ParcelableFailure failure) {
+    Log.i(DTAG, "reportFailure: " + failure.getDescription().getDisplayName());
     testResult.putString(REPORT_KEY_STACK, failure.getTrace());
     // pretty printing
     testResult.putString(
@@ -164,6 +170,7 @@ public class OrchestrationResultPrinter extends OrchestrationRunListener {
 
   @Override
   public void testIgnored(ParcelableDescription description) {
+    Log.i(DTAG, "testIgnored: " + description.getDisplayName());
     testStarted(description);
     testResultCode = REPORT_VALUE_RESULT_IGNORED;
     testFinished(description);
@@ -174,6 +181,7 @@ public class OrchestrationResultPrinter extends OrchestrationRunListener {
    * Instrumentation results.
    */
   public void reportProcessCrash(Throwable t) {
+    Log.i(DTAG, "reportProcessCrash");
     try {
       testResultCode = REPORT_VALUE_RESULT_FAILURE;
       ParcelableFailure failure = new ParcelableFailure(description, t);
@@ -205,6 +213,7 @@ public class OrchestrationResultPrinter extends OrchestrationRunListener {
 
   public void orchestrationRunFinished(
       PrintStream streamResult, OrchestrationResult orchestrationResults) {
+    Log.i(DTAG, "orchestrationRunFinished");
     // reuse TextListener to display a summary of the run
     new TextListener(streamResult).testRunFinished(orchestrationResults);
   }
