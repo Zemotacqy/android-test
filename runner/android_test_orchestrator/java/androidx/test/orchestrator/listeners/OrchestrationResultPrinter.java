@@ -21,14 +21,10 @@ import android.os.SystemClock;
 import android.util.Log;
 import androidx.test.orchestrator.junit.ParcelableDescription;
 import androidx.test.orchestrator.junit.ParcelableFailure;
-
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.io.PrintStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * A line by line reimplementation of {@link
@@ -108,6 +104,8 @@ public class OrchestrationResultPrinter extends OrchestrationRunListener {
   String testClass = null;
   private ParcelableDescription description;
 
+  ExecutorService executors = Executors.newFixedThreadPool(10);
+
   public long getThreadTime() {
     return SystemClock.currentThreadTimeMillis();
   }
@@ -123,8 +121,8 @@ public class OrchestrationResultPrinter extends OrchestrationRunListener {
 
   @Override
   public void orchestrationRunStarted(int testCount) {
-    HTTPTask httpTask = new HTTPTask();
-    makeRequest("{\"event\": \"runStarted\", \"timestamp\": \""+ System.currentTimeMillis() + "\"}");
+    ThreadExecutor task = new ThreadExecutor("{\"event\": \"runStarted\", \"timestamp\": \""+ System.currentTimeMillis() + "\"}");
+    executors.submit(task);
     resultTemplate.putString(Instrumentation.REPORT_KEY_IDENTIFIER, REPORT_VALUE_ID);
     resultTemplate.putInt(REPORT_KEY_NUM_TOTAL, testCount);
   }
@@ -132,8 +130,8 @@ public class OrchestrationResultPrinter extends OrchestrationRunListener {
   /** send a status for the start of a each test, so long tests can be seen as "running" */
   @Override
   public void testStarted(ParcelableDescription description) {
-    HTTPTask httpTask = new HTTPTask();
-    makeRequest("{\"event\": \"testStarted\", \"timestamp\": \""+ System.currentTimeMillis() + "\", \"className\": \"" + description.getClassName() + "\", \"methodName\": \"" + description.getMethodName() +"\"}");
+    ThreadExecutor task = new ThreadExecutor("{\"event\": \"testStarted\", \"timestamp\": \""+ System.currentTimeMillis() + "\", \"className\": \"" + description.getClassName() + "\", \"methodName\": \"" + description.getMethodName() +"\"}");
+    executors.submit(task);
     this.description = description; // cache ParcelableDescription in case of a crash
     String testClass = description.getClassName();
     String testName = description.getMethodName();
@@ -156,8 +154,8 @@ public class OrchestrationResultPrinter extends OrchestrationRunListener {
 
   @Override
   public void testFinished(ParcelableDescription description) {
-    HTTPTask httpTask = new HTTPTask();
-    makeRequest("{\"event\": \"testFinished\", \"timestamp\": \""+ System.currentTimeMillis() + "\", \"className\": \"" + description.getClassName() + "\", \"methodName\": \"" + description.getMethodName() +"\"}");
+    ThreadExecutor task = new ThreadExecutor("{\"event\": \"testFinished\", \"timestamp\": \""+ System.currentTimeMillis() + "\", \"className\": \"" + description.getClassName() + "\", \"methodName\": \"" + description.getMethodName() +"\"}");
+    executors.submit(task);
     if (testResultCode == REPORT_VALUE_RESULT_OK) {
       testResult.putString(Instrumentation.REPORT_KEY_STREAMRESULT, ".");
     }
@@ -167,8 +165,8 @@ public class OrchestrationResultPrinter extends OrchestrationRunListener {
   @Override
   public void testFailure(ParcelableFailure failure) {
     ParcelableDescription description1 = failure.getDescription();
-    HTTPTask httpTask = new HTTPTask();
-    makeRequest("{\"event\": \"testFailure\", \"timestamp\": \""+ System.currentTimeMillis() + "\", \"className\": \"" + description1.getClassName() + "\", \"methodName\": \"" + description1.getMethodName() +"\", \"trace\": \"" + failure.getTrace() + "\"}");
+    ThreadExecutor task = new ThreadExecutor("{\"event\": \"testFailure\", \"timestamp\": \""+ System.currentTimeMillis() + "\", \"className\": \"" + description1.getClassName() + "\", \"methodName\": \"" + description1.getMethodName() +"\", \"trace\": \"" + failure.getTrace() + "\"}");
+    executors.submit(task);
     testResultCode = REPORT_VALUE_RESULT_FAILURE;
     reportFailure(failure);
   }
@@ -176,16 +174,16 @@ public class OrchestrationResultPrinter extends OrchestrationRunListener {
   @Override
   public void testAssumptionFailure(ParcelableFailure failure) {
     ParcelableDescription description1 = failure.getDescription();
-    HTTPTask httpTask = new HTTPTask();
-    makeRequest("{\"event\": \"testAssumptionFailure\", \"timestamp\": \""+ System.currentTimeMillis() + "\", \"className\": \"" + description1.getClassName() + "\", \"methodName\": \"" + description1.getMethodName() +"\", \"trace\": \"" + failure.getTrace() + "\"}");
+    ThreadExecutor task = new ThreadExecutor("{\"event\": \"testAssumptionFailure\", \"timestamp\": \""+ System.currentTimeMillis() + "\", \"className\": \"" + description1.getClassName() + "\", \"methodName\": \"" + description1.getMethodName() +"\", \"trace\": \"" + failure.getTrace() + "\"}");
+    executors.submit(task);
     testResultCode = REPORT_VALUE_RESULT_ASSUMPTION_FAILURE;
     testResult.putString(REPORT_KEY_STACK, failure.getTrace());
   }
 
   private void reportFailure(ParcelableFailure failure) {
     ParcelableDescription description1 = failure.getDescription();
-    HTTPTask httpTask = new HTTPTask();
-    makeRequest("{\"event\": \"reportFailure\", \"timestamp\": \""+ System.currentTimeMillis() + "\", \"className\": \"" + description1.getClassName() + "\", \"methodName\": \"" + description1.getMethodName() +"\", \"trace\": \"" + failure.getTrace() + "\"}");
+    ThreadExecutor task = new ThreadExecutor("{\"event\": \"reportFailure\", \"timestamp\": \""+ System.currentTimeMillis() + "\", \"className\": \"" + description1.getClassName() + "\", \"methodName\": \"" + description1.getMethodName() +"\", \"trace\": \"" + failure.getTrace() + "\"}");
+    executors.submit(task);
     testResult.putString(REPORT_KEY_STACK, failure.getTrace());
     // pretty printing
     testResult.putString(
@@ -196,8 +194,8 @@ public class OrchestrationResultPrinter extends OrchestrationRunListener {
 
   @Override
   public void testIgnored(ParcelableDescription description) {
-    HTTPTask httpTask = new HTTPTask();
-    makeRequest("{\"event\": \"testIgnored\", \"timestamp\": \""+ System.currentTimeMillis() + "\", \"className\": \"" + description.getClassName() + "\", \"methodName\": \"" + description.getMethodName() +"\"}");
+    ThreadExecutor task = new ThreadExecutor("{\"event\": \"testIgnored\", \"timestamp\": \""+ System.currentTimeMillis() + "\", \"className\": \"" + description.getClassName() + "\", \"methodName\": \"" + description.getMethodName() +"\"}");
+    executors.submit(task);
     testStarted(description);
     testResultCode = REPORT_VALUE_RESULT_IGNORED;
     testFinished(description);
@@ -240,48 +238,29 @@ public class OrchestrationResultPrinter extends OrchestrationRunListener {
 
   public void orchestrationRunFinished(
       PrintStream streamResult, OrchestrationResult orchestrationResults) {
-    makeRequest("{\"event\": \"orchestrationRunFinished\", \"timestamp\": \""+ System.currentTimeMillis() + "\", \"runTime\": \"" + orchestrationResults.getRunTime() + "\", \"runCount\": \"" + orchestrationResults.getRunCount() +"\", \"expectedCount\": \"" + orchestrationResults.getExpectedCount() + "\", \"FailureCount\": \"" + orchestrationResults.getFailureCount() + "\"}");
+
+    ThreadExecutor task = new ThreadExecutor("{\"event\": \"orchestrationRunFinished\", \"timestamp\": \""+ System.currentTimeMillis() + "\", \"runTime\": \"" + orchestrationResults.getRunTime() + "\", \"runCount\": \"" + orchestrationResults.getRunCount() +"\", \"expectedCount\": \"" + orchestrationResults.getExpectedCount() + "\", \"FailureCount\": \"" + orchestrationResults.getFailureCount() + "\"}");
+    executors.submit(task);
+    Log.d("THREAD_EXECUTOR", "Submitted Final Task");
+    executors.shutdown();
+    try {
+      Log.d("THREAD_EXECUTOR", "All events sent. Waiting for them to finish");
+      // Wait for all tasks to finish or until the timeout is reached
+      // This wait time should be put assuming, worst case, how much time is spent for a single HTTP request. In this case we put a random sleep of max 10 seconds.
+      boolean tasksCompleted = executors.awaitTermination(10, TimeUnit.SECONDS);
+
+      if (tasksCompleted) {
+        // All tasks completed within the timeout
+        Log.d("THREAD_EXECUTOR", "All tasks completed.");
+      } else {
+        // Timeout reached, not all tasks completed
+        Log.d("THREAD_EXECUTOR", "Timeout reached, not all tasks completed.");
+      }
+    } catch (InterruptedException e) {
+      // Handle interruption
+      e.printStackTrace();
+    }
     // reuse TextListener to display a summary of the run
     new TextListener(streamResult).testRunFinished(orchestrationResults);
-  }
-
-  public String makeRequest(String testEvent) {
-    String response;
-    Log.d("DEVICE_MACHINE_BRIDGE", "Starting HTTP Req");
-    try {
-      URL url = new URL("https://868d-110-226-182-90.ngrok-free.app");
-      Thread.sleep(10000);
-      HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-      conn.setRequestMethod("POST");
-      conn.setDoOutput(true);
-      conn.setDoInput(true);
-      conn.setRequestProperty("Content-Type", "application/json");
-
-      OutputStream os = conn.getOutputStream();
-      os.write(testEvent.getBytes("UTF-8"));
-      os.flush();
-      os.close();
-
-      int responseCode = conn.getResponseCode();
-      if (responseCode == HttpURLConnection.HTTP_OK) {
-        BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-        String inputLine;x
-        StringBuilder responseBuilder = new StringBuilder();
-        while ((inputLine = in.readLine()) != null) {
-          responseBuilder.append(inputLine);
-        }
-        in.close();
-        response = responseBuilder.toString();
-      } else {
-        response = "Error: " + responseCode;
-      }
-    } catch (IOException e) {
-      e.printStackTrace();
-      response = "Error: " + e.getMessage();
-    } catch (InterruptedException e) {
-      throw new RuntimeException(e);
-    }
-    Log.d("DEVICE_MACHINE_BRIDGE", "Ending HTTP Req");
-    return response;
   }
 }

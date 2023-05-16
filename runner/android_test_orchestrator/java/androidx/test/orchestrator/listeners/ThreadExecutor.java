@@ -1,35 +1,40 @@
 package androidx.test.orchestrator.listeners;
 
-
-import android.os.AsyncTask;
 import android.util.Log;
-
-import org.json.JSONException;
-import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
-import java.net.ProtocolException;
 import java.net.URL;
+import java.util.Random;
+
+public class ThreadExecutor implements Runnable {
+
+    private static String TAG = "THREAD_EXECUTOR";
+    private String requestBody;
 
 
-public class HTTPTask extends AsyncTask {
-
-    String TAG = "DEVICE_MACHINE_BRIDGE";
-
+    public ThreadExecutor(String requestBody) {
+        this.requestBody = requestBody;
+    }
 
     @Override
-    protected Object doInBackground(Object[] objects) {
-        String postData = (String) objects[0];
-        Log.d(TAG, "postData: " + postData );
+    public void run() {
+//        Log.d(TAG, "postData: " + this.requestBody );
 
         String response = "";
 
+        Random r = new Random();
         try {
+            Thread.sleep(r.nextInt(10)*1000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        try {
+            Log.d(TAG, "Making Request for: " + this.requestBody );
             URL url = new URL("https://868d-110-226-182-90.ngrok-free.app");
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
@@ -38,7 +43,7 @@ public class HTTPTask extends AsyncTask {
             conn.setRequestProperty("Content-Type", "application/json");
 
             OutputStream os = conn.getOutputStream();
-            os.write(postData.getBytes("UTF-8"));
+            os.write(this.requestBody.getBytes("UTF-8"));
             os.flush();
             os.close();
 
@@ -59,6 +64,6 @@ public class HTTPTask extends AsyncTask {
             e.printStackTrace();
             response = "Error: " + e.getMessage();
         }
-        return response;
+        Log.d(TAG, "Response: " + response);
     }
 }
