@@ -17,10 +17,15 @@ package androidx.test.orchestrator.listeners;
 
 import android.app.Instrumentation;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.SystemClock;
 import android.util.Log;
 import androidx.test.orchestrator.junit.ParcelableDescription;
 import androidx.test.orchestrator.junit.ParcelableFailure;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -104,8 +109,6 @@ public class OrchestrationResultPrinter extends OrchestrationRunListener {
   String testClass = null;
   private ParcelableDescription description;
 
-  ExecutorService executors = Executors.newFixedThreadPool(10);
-
   public long getThreadTime() {
     return SystemClock.currentThreadTimeMillis();
   }
@@ -121,8 +124,7 @@ public class OrchestrationResultPrinter extends OrchestrationRunListener {
 
   @Override
   public void orchestrationRunStarted(int testCount) {
-    ThreadExecutor task = new ThreadExecutor("{\"event\": \"runStarted\", \"timestamp\": \""+ System.currentTimeMillis() + "\"}");
-    executors.submit(task);
+    writeToFile("{\"event\": \"runStarted\", \"timestamp\": \""+ System.currentTimeMillis() + "\"}");
     resultTemplate.putString(Instrumentation.REPORT_KEY_IDENTIFIER, REPORT_VALUE_ID);
     resultTemplate.putInt(REPORT_KEY_NUM_TOTAL, testCount);
   }
@@ -130,8 +132,7 @@ public class OrchestrationResultPrinter extends OrchestrationRunListener {
   /** send a status for the start of a each test, so long tests can be seen as "running" */
   @Override
   public void testStarted(ParcelableDescription description) {
-    ThreadExecutor task = new ThreadExecutor("{\"event\": \"testStarted\", \"timestamp\": \""+ System.currentTimeMillis() + "\", \"className\": \"" + description.getClassName() + "\", \"methodName\": \"" + description.getMethodName() +"\"}");
-    executors.submit(task);
+    writeToFile("{\"event\": \"testStarted\", \"timestamp\": \""+ System.currentTimeMillis() + "\", \"className\": \"" + description.getClassName() + "\", \"methodName\": \"" + description.getMethodName() +"\"}");
     this.description = description; // cache ParcelableDescription in case of a crash
     String testClass = description.getClassName();
     String testName = description.getMethodName();
@@ -154,8 +155,7 @@ public class OrchestrationResultPrinter extends OrchestrationRunListener {
 
   @Override
   public void testFinished(ParcelableDescription description) {
-    ThreadExecutor task = new ThreadExecutor("{\"event\": \"testFinished\", \"timestamp\": \""+ System.currentTimeMillis() + "\", \"className\": \"" + description.getClassName() + "\", \"methodName\": \"" + description.getMethodName() +"\"}");
-    executors.submit(task);
+    writeToFile("{\"event\": \"testFinished\", \"timestamp\": \""+ System.currentTimeMillis() + "\", \"className\": \"" + description.getClassName() + "\", \"methodName\": \"" + description.getMethodName() +"\"}");
     if (testResultCode == REPORT_VALUE_RESULT_OK) {
       testResult.putString(Instrumentation.REPORT_KEY_STREAMRESULT, ".");
     }
@@ -165,8 +165,7 @@ public class OrchestrationResultPrinter extends OrchestrationRunListener {
   @Override
   public void testFailure(ParcelableFailure failure) {
     ParcelableDescription description1 = failure.getDescription();
-    ThreadExecutor task = new ThreadExecutor("{\"event\": \"testFailure\", \"timestamp\": \""+ System.currentTimeMillis() + "\", \"className\": \"" + description1.getClassName() + "\", \"methodName\": \"" + description1.getMethodName() +"\", \"trace\": \"" + failure.getTrace() + "\"}");
-    executors.submit(task);
+    writeToFile("{\"event\": \"testFailure\", \"timestamp\": \""+ System.currentTimeMillis() + "\", \"className\": \"" + description1.getClassName() + "\", \"methodName\": \"" + description1.getMethodName() +"\", \"trace\": \"" + failure.getTrace() + "\"}");
     testResultCode = REPORT_VALUE_RESULT_FAILURE;
     reportFailure(failure);
   }
@@ -174,16 +173,14 @@ public class OrchestrationResultPrinter extends OrchestrationRunListener {
   @Override
   public void testAssumptionFailure(ParcelableFailure failure) {
     ParcelableDescription description1 = failure.getDescription();
-    ThreadExecutor task = new ThreadExecutor("{\"event\": \"testAssumptionFailure\", \"timestamp\": \""+ System.currentTimeMillis() + "\", \"className\": \"" + description1.getClassName() + "\", \"methodName\": \"" + description1.getMethodName() +"\", \"trace\": \"" + failure.getTrace() + "\"}");
-    executors.submit(task);
+    writeToFile("{\"event\": \"testAssumptionFailure\", \"timestamp\": \""+ System.currentTimeMillis() + "\", \"className\": \"" + description1.getClassName() + "\", \"methodName\": \"" + description1.getMethodName() +"\", \"trace\": \"" + failure.getTrace() + "\"}");
     testResultCode = REPORT_VALUE_RESULT_ASSUMPTION_FAILURE;
     testResult.putString(REPORT_KEY_STACK, failure.getTrace());
   }
 
   private void reportFailure(ParcelableFailure failure) {
     ParcelableDescription description1 = failure.getDescription();
-    ThreadExecutor task = new ThreadExecutor("{\"event\": \"reportFailure\", \"timestamp\": \""+ System.currentTimeMillis() + "\", \"className\": \"" + description1.getClassName() + "\", \"methodName\": \"" + description1.getMethodName() +"\", \"trace\": \"" + failure.getTrace() + "\"}");
-    executors.submit(task);
+    writeToFile("{\"event\": \"reportFailure\", \"timestamp\": \""+ System.currentTimeMillis() + "\", \"className\": \"" + description1.getClassName() + "\", \"methodName\": \"" + description1.getMethodName() +"\", \"trace\": \"" + failure.getTrace() + "\"}");
     testResult.putString(REPORT_KEY_STACK, failure.getTrace());
     // pretty printing
     testResult.putString(
@@ -194,8 +191,7 @@ public class OrchestrationResultPrinter extends OrchestrationRunListener {
 
   @Override
   public void testIgnored(ParcelableDescription description) {
-    ThreadExecutor task = new ThreadExecutor("{\"event\": \"testIgnored\", \"timestamp\": \""+ System.currentTimeMillis() + "\", \"className\": \"" + description.getClassName() + "\", \"methodName\": \"" + description.getMethodName() +"\"}");
-    executors.submit(task);
+    writeToFile("{\"event\": \"testIgnored\", \"timestamp\": \""+ System.currentTimeMillis() + "\", \"className\": \"" + description.getClassName() + "\", \"methodName\": \"" + description.getMethodName() +"\"}");
     testStarted(description);
     testResultCode = REPORT_VALUE_RESULT_IGNORED;
     testFinished(description);
@@ -239,28 +235,27 @@ public class OrchestrationResultPrinter extends OrchestrationRunListener {
   public void orchestrationRunFinished(
       PrintStream streamResult, OrchestrationResult orchestrationResults) {
 
-    ThreadExecutor task = new ThreadExecutor("{\"event\": \"orchestrationRunFinished\", \"timestamp\": \""+ System.currentTimeMillis() + "\", \"runTime\": \"" + orchestrationResults.getRunTime() + "\", \"runCount\": \"" + orchestrationResults.getRunCount() +"\", \"expectedCount\": \"" + orchestrationResults.getExpectedCount() + "\", \"FailureCount\": \"" + orchestrationResults.getFailureCount() + "\"}");
-    executors.submit(task);
-    Log.d("THREAD_EXECUTOR", "Submitted Final Task");
-    executors.shutdown();
-    try {
-      Log.d("THREAD_EXECUTOR", "All events sent. Waiting for them to finish");
-      // Wait for all tasks to finish or until the timeout is reached
-      // This wait time should be put assuming, worst case, how much time is spent for a single HTTP request. In this case we put a random sleep of max 10 seconds.
-      boolean tasksCompleted = executors.awaitTermination(10, TimeUnit.SECONDS);
+    writeToFile("{\"event\": \"orchestrationRunFinished\", \"timestamp\": \""+ System.currentTimeMillis() + "\", \"runTime\": \"" + orchestrationResults.getRunTime() + "\", \"runCount\": \"" + orchestrationResults.getRunCount() +"\", \"expectedCount\": \"" + orchestrationResults.getExpectedCount() + "\", \"FailureCount\": \"" + orchestrationResults.getFailureCount() + "\"}");
 
-      if (tasksCompleted) {
-        // All tasks completed within the timeout
-        Log.d("THREAD_EXECUTOR", "All tasks completed.");
-      } else {
-        // Timeout reached, not all tasks completed
-        Log.d("THREAD_EXECUTOR", "Timeout reached, not all tasks completed.");
-      }
-    } catch (InterruptedException e) {
-      // Handle interruption
-      e.printStackTrace();
-    }
     // reuse TextListener to display a summary of the run
     new TextListener(streamResult).testRunFinished(orchestrationResults);
+  }
+
+  public void writeToFile(String eventsData) {
+    String dataFile = "/sdcard/Download/eventsData.log";
+    Log.i("THREAD_EXECUTOR", "Writing events data to file: " + dataFile);
+    try {
+      // Ensure the file does not exist on the device. Otherwise gives EACCESS issue as the file would have been touched by root and this is a diff user.
+      FileOutputStream outputStream = new FileOutputStream(dataFile, true);
+      if (eventsData != null) {
+        eventsData += "\n";
+        outputStream.write(eventsData.getBytes());
+      } else {
+        outputStream.write("false\n".getBytes());
+      }
+      outputStream.close();
+    } catch (Exception ex) {
+      Log.i("THREAD_EXECUTOR", "Exception: " + ex.getMessage());
+    }
   }
 }
